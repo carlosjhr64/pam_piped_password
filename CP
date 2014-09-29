@@ -1,0 +1,16 @@
+#!/usr/local/bin/ruby
+
+SECURITY = '/usr/lib64/security'
+NAME     = ARGV.shift || 'pam_piped_password'
+
+puts      "cp ./#{NAME}.so #{SECURITY}/#{NAME}.so"
+if system "cp ./#{NAME}.so #{SECURITY}/#{NAME}.so"
+
+  puts      "chown root:root #{SECURITY}/#{NAME}.so"
+  if system "chown root:root #{SECURITY}/#{NAME}.so"
+
+    puts   "chmod 755 #{SECURITY}/#{NAME}.so"
+    system "chmod 755 #{SECURITY}/#{NAME}.so"
+
+  end
+end

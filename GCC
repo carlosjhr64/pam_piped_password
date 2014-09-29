@@ -1,0 +1,6 @@
+#!/usr/local/bin/ruby
+
+NAME = ARGV.shift || 'pam_piped_password'
+
+puts   "gcc -fPIC -DPIC -shared -rdynamic -o #{NAME}.so #{NAME}.c"
+system "gcc -fPIC -DPIC -shared -rdynamic -o #{NAME}.so #{NAME}.c"
