@@ -34,29 +34,30 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
  */
 int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 
-  // expect single simple command
+  // Expect a single simple command.
   if (argc != 1) { return(PAM_IGNORE); }
 
-  int pgu_ret;
+  int ret;
 
-  // get user
-  const char *user = NULL;
-  pgu_ret = pam_get_user(pamh, &user, NULL);
-  if (pgu_ret != PAM_SUCCESS || user == NULL) { return(PAM_IGNORE); }
+  // Get user.
+  const char *USER = NULL;
+  ret = pam_get_user(pamh, &USER, NULL);
+  if (ret != PAM_SUCCESS || USER == NULL) { return(PAM_IGNORE); }
 
   // PAM_USER PAM_USER= PAM_USER=username
-  char *KEY = "PAM_USER";
+  const char *KEY = "PAM_USER";
 
-  // set PAM_USER in the enviroment to username
-  int userl = strlen(KEY) + strlen(user) + 2;
+  // Set PAM_USER in the enviroment to username.
+  int userl = strlen(KEY) + strlen(USER) + 2;
   char pam_user[userl];
   strcpy(pam_user, KEY);
   strcat(pam_user, "=");
-  strcat(pam_user, user);
-  pgu_ret = pam_putenv(pamh, pam_user);
-  if (pgu_ret != PAM_SUCCESS) { return(PAM_IGNORE); }
+  strcat(pam_user, USER);
+  ret = pam_putenv(pamh, pam_user);
+  if (ret != PAM_SUCCESS) { return(PAM_IGNORE); }
 
-  // get the password via the simple command
+  // Get the password via the simple command.
+  int got_pwd = 0;
   int pwdl = 65;
   char pwd[pwdl];
   FILE *pipe;
@@ -67,17 +68,7 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
         int n = strlen(pwd)-1;
         if (pwd[n] == '\n'){
           pwd[n] = '\0'; // End Of String
-          pgu_ret = pam_set_item(pamh, PAM_AUTHTOK, pwd);
-          if (pgu_ret == PAM_SUCCESS) {
-            pgu_ret = pam_putenv(pamh, KEY);
-            if (pgu_ret == PAM_SUCCESS) {
-              // everything as expected, go!
-              return(PAM_SUCCESS);
-            }else{
-              // Could not clear PAM_USER, ignore?
-              return(PAM_IGNORE);
-            }
-          }
+          got_pwd = 1;
         }
       }
     }else{
@@ -85,10 +76,18 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
     }
   }
 
-  // Clear PAM_USER
-  pgu_ret = pam_putenv(pamh, KEY);
-  // Could not clear PAM_USER, ignore?
-  if (pgu_ret != PAM_SUCCESS) { return(PAM_IGNORE); }
+  // Clear PAM_USER from enviroment.
+  ret = pam_putenv(pamh, KEY);
+  if (ret != PAM_SUCCESS) { return(PAM_IGNORE); }
+
+  // Set PAM_AUTHTOK with pwd.
+  if (got_pwd==1) {
+    ret = pam_set_item(pamh, PAM_AUTHTOK, pwd);
+    if (ret == PAM_SUCCESS) {
+      // Was able to set password, everything as expected, go!
+      return(PAM_SUCCESS);
+    }
+  }
 
   return(PAM_IGNORE);
 }
