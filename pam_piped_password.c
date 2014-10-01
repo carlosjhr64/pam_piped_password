@@ -27,7 +27,11 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
   return(PAM_IGNORE);
 }
 
-/* PAM entry point for authentication verification */
+/*
+ * PAM entry point for authentication verification
+ * Note:  I don't know what I should return if unable to clear ENV
+ * or why that would ever happen, so just returning PAM_IGNORE.
+ */
 int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 
   // expect single simple command
@@ -40,11 +44,14 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
   pgu_ret = pam_get_user(pamh, &user, NULL);
   if (pgu_ret != PAM_SUCCESS || user == NULL) { return(PAM_IGNORE); }
 
-  // set PAM_USER in the enviroment
-  char *key = "PAM_USER=";
-  int userl = strlen(key) + strlen(user) + 1;
+  // PAM_USER PAM_USER= PAM_USER=username
+  char *KEY = "PAM_USER";
+
+  // set PAM_USER in the enviroment to username
+  int userl = strlen(KEY) + strlen(user) + 2;
   char pam_user[userl];
-  strcpy(pam_user, key);
+  strcpy(pam_user, KEY);
+  strcat(pam_user, "=");
   strcat(pam_user, user);
   pgu_ret = pam_putenv(pamh, pam_user);
   if (pgu_ret != PAM_SUCCESS) { return(PAM_IGNORE); }
@@ -62,8 +69,14 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
           pwd[n] = '\0'; // End Of String
           pgu_ret = pam_set_item(pamh, PAM_AUTHTOK, pwd);
           if (pgu_ret == PAM_SUCCESS) {
-            // everything as expected, go!
-            return(PAM_SUCCESS);
+            pgu_ret = pam_putenv(pamh, KEY);
+            if (pgu_ret == PAM_SUCCESS) {
+              // everything as expected, go!
+              return(PAM_SUCCESS);
+            }else{
+              // Could not clear PAM_USER, ignore?
+              return(PAM_IGNORE);
+            }
           }
         }
       }
@@ -71,6 +84,11 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **ar
       pclose(pipe);
     }
   }
+
+  // Clear PAM_USER
+  pgu_ret = pam_putenv(pamh, KEY);
+  // Could not clear PAM_USER, ignore?
+  if (pgu_ret != PAM_SUCCESS) { return(PAM_IGNORE); }
 
   return(PAM_IGNORE);
 }
